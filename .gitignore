@@ -1,0 +1,23 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+
+# Env / secrets (keep .env.example only)
+.env
+.env.local
+*.env.local
+
+# Node / Next.js (admin-web)
+admin-web/node_modules/
+admin-web/.next/
+admin-web/tsconfig.tsbuildinfo
+admin-web/npm-debug.log*
+admin-web/next-env.d.ts
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

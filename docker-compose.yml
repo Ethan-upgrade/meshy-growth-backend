@@ -1,0 +1,187 @@
+x-mysql-env: &mysql-env
+  MYSQL_DSN: "app:app@tcp(mysql:3306)/growth?parseTime=true&multiStatements=true"
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: growth
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uapp", "-papp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.7.0
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  migrate:
+    build:
+      context: .
+      args:
+        SERVICE: migrate
+    environment:
+      <<: *mysql-env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  event-gateway:
+    build:
+      context: .
+      args:
+        SERVICE: event-gateway
+    environment:
+      <<: *mysql-env
+      HTTP_ADDR: ":8080"
+      KAFKA_BROKERS: "kafka:9092"
+    ports:
+      - "8081:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+
+  conversion-worker:
+    build:
+      context: .
+      args:
+        SERVICE: conversion-worker
+    environment:
+      <<: *mysql-env
+      REDIS_ADDR: "redis:6379"
+      KAFKA_BROKERS: "kafka:9092"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  pipeline-worker:
+    build:
+      context: .
+      args:
+        SERVICE: pipeline-worker
+    environment:
+      <<: *mysql-env
+      REDIS_ADDR: "redis:6379"
+      KAFKA_BROKERS: "kafka:9092"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  experiment-service:
+    build:
+      context: .
+      args:
+        SERVICE: experiment-service
+    environment:
+      <<: *mysql-env
+      HTTP_ADDR: ":8080"
+    ports:
+      - "8082:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  admin-api:
+    build:
+      context: .
+      args:
+        SERVICE: admin-api
+    environment:
+      <<: *mysql-env
+      HTTP_ADDR: ":8080"
+      REDIS_ADDR: "redis:6379"
+      EXPERIMENT_SERVICE_URL: "http://experiment-service:8080"
+    ports:
+      - "8083:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      experiment-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  asynqmon:
+    image: hibiken/asynqmon:latest
+    command: ["--redis-addr=redis:6379"]
+    ports:
+      - "8090:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  admin-web:
+    build:
+      context: ./admin-web
+    environment:
+      ADMIN_API_URL: "http://admin-api:8080"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - admin-api
+
+  seed:
+    build:
+      context: .
+      args:
+        SERVICE: seed
+    environment:
+      <<: *mysql-env
+      EVENT_GATEWAY_URL: "http://event-gateway:8080"
+      EXPERIMENT_SERVICE_URL: "http://experiment-service:8080"
+    depends_on:
+      event-gateway:
+        condition: service_started
+      experiment-service:
+        condition: service_started
+    profiles: ["seed"]
+
+volumes:
+  mysql-data:
