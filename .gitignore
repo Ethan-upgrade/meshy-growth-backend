@@ -20,4 +20,8 @@ admin-web/next-env.d.ts
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Third-party test datasets (fetched on demand, see testdata/README.md)
+testdata/*.csv
+
 .idea/
