@@ -191,3 +191,4 @@ watch -n 10 'docker compose exec mysql mysql -uapp -papp growth -e "SELECT statu
 - 发布前的测试验证标准 → [06 调试手册 · 验收测试清单](06-debugging-guide.md#5-验收测试清单发布前必过)
 - 优雅关闭的实现原理 → [02 架构设计 · 关键设计要点](02-architecture.md#6-关键设计要点面试评审常被追问的点)
 - 发布决策流程（Go/No-Go）→ [01 建设 SOP · 阶段6](01-build-sop.md#阶段-6灰度发布与上线)
+- 自动化构建/测试/出镜像流水线（已部分缓解本文档第3节提到的"无镜像仓库"局限）→ [09 CI/CD 镜像构建与测试流水线](09-cicd-image-pipeline.md)
