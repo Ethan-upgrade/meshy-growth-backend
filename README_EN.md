@@ -1,21 +1,45 @@
-﻿# meshy-growth-backend
+﻿# meshy-growth-backend (Go growth backend)
 
-Go growth backend: behavior event tracking, ad conversion callbacks, A/B experiments, and an operations admin UI.
+A Go growth backend: **behavioral event tracking, ad-conversion callbacks, A/B experiment bucketing**, plus an **operations admin UI** (admin-web).
 
-- **Language:** Go
+## Features
+- Behavioral event ingestion and persistence
+- Ad-platform **conversion callbacks**
+- **A/B experiments** bucketing and stats
+- Operations admin (admin-web)
 
-> English README. If a README.md exists in this repository, it contains the original-language details.
+## Architecture & Workflow
+```mermaid
+flowchart LR
+    C[Client / channel] -->|event report| API[cmd/ service API]
+    API --> EVT[(events/conversions DB via migrations)]
+    API -->|conversion callback| AD[Ad platform callback]
+    API --> EXP[A/B bucketing]
+    ADMIN[admin-web console] --> API
+```
 
-## Overview
-
-This repository: Go growth backend: behavior event tracking, ad conversion callbacks, A/B experiments, and an operations admin UI.
+## Project Structure
+```
+meshy-growth-backend/
+├─ cmd/            # service entry
+├─ internal/       # core logic (API/events/experiments)
+├─ admin-web/      # admin frontend
+├─ migrations/     # DB migrations
+├─ docs/
+├─ testdata/
+├─ docker-compose.yml / Dockerfile / go.mod
+└─ .env.example
+```
 
 ## Getting Started
+```
+cp .env.example .env
+docker-compose up --build         # or: go run ./cmd/...
+# see admin-web/ for the admin console
+```
 
-Clone the repository and follow the project's own instructions (see code, README.md, and language-specific setup files such as package.json, equirements.txt, or go.mod).
-
-    git clone https://github.com/Ethan-upgrade/meshy-growth-backend.git
+## Configuration
+See `.env.example`.
 
 ## License
-
-See the repository for license information.
+See the repository.
